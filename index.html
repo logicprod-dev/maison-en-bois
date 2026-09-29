@@ -105,7 +105,7 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
 .lbl:hover{border-color:var(--ink)}
 .lbl.ext{background:rgba(251,251,249,.6);color:var(--ink2);font-weight:400;border-color:transparent}
 .bar{position:absolute;display:flex;background:var(--paper);border:1px solid var(--line2);z-index:4}
-#tools{top:14px;left:14px;max-width:calc(100% - 220px);overflow-x:auto;scrollbar-width:none}
+#tools{top:14px;left:14px;max-width:calc(100% - 370px);overflow-x:auto;scrollbar-width:none}
 #tools::-webkit-scrollbar{display:none}
 .lv button{width:56px;border:0;border-right:1px solid var(--line);background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 0}
 .lv button b{font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:.04em}
@@ -119,7 +119,16 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
 .tb button:hover{background:var(--hover)}
 .tb button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
 .tb button.walkb[aria-pressed="true"]{background:var(--black);color:var(--onblack);border-bottom-color:var(--black)}
-#buildBtn{position:absolute;top:14px;right:14px;z-index:4;border:1px solid var(--ink);background:var(--paper);padding:9px 16px;font-size:12.5px;display:flex;gap:8px;align-items:center}
+#topRight{position:absolute;top:14px;right:14px;z-index:4;display:flex;gap:8px}
+#buildBtn,#demoBtn{border:1px solid var(--ink);background:var(--paper);padding:9px 16px;font-size:12.5px;display:flex;gap:8px;align-items:center;white-space:nowrap}
+#demoBtn{background:var(--black);color:var(--onblack)}
+#demoBtn:hover{background:#3a3936}
+#demoBar{position:absolute;left:0;right:0;top:0;height:3px;z-index:5;background:rgba(0,0,0,.06)}
+#demoBar i{display:block;height:100%;width:0;background:var(--sel)}
+#demoCap{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:4;background:var(--paper);border:1px solid var(--ink);
+  padding:10px 24px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;pointer-events:none;white-space:nowrap}
+#demoCap b{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:.02em}
+#demoCap span{font-size:12px;color:var(--ink2)}
 #buildBtn:hover{background:var(--black);color:var(--onblack)}
 #hint{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);z-index:3;background:rgba(251,251,249,.9);border:1px solid var(--line2);
   padding:5px 14px;font-size:11px;color:var(--ink2);white-space:nowrap;pointer-events:none;max-width:calc(100% - 120px);overflow:hidden;text-overflow:ellipsis}
@@ -172,7 +181,10 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
   #top{gap:10px;padding:0 12px}
   .radio{gap:10px}
   #tools{max-width:calc(100% - 28px)}
-  #buildBtn{top:auto;bottom:66px;right:14px;padding:7px 12px}
+  #topRight{top:auto;bottom:66px}
+  #buildBtn{display:none}
+  #demoBtn{padding:7px 12px}
+  #demoCap{bottom:auto;top:70px}
   #hint{display:none}
   .speeds{display:none}
   #scrub{width:28%}
@@ -273,7 +285,9 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
         <button id="bWalk" class="walkb" aria-pressed="false"><svg viewBox="0 0 16 16"><circle cx="8.5" cy="2.8" r="1.3"/><path d="M8 5.5 6 9.5l2.5 1.5-1 3.5 M8 5.5l2.5 2.5 2 .5 M8 5.5 7 8 4 9"/></svg>Visite</button>
       </div>
     </div>
-    <button id="buildBtn">▶ Lancer l'assemblage</button>
+    <div id="topRight"><button id="demoBtn">▶ Démo 30 s</button><button id="buildBtn">▶ Lancer l'assemblage</button></div>
+    <div id="demoBar" hidden><i></i></div>
+    <div id="demoCap" hidden><b id="demoT"></b><span id="demoS"></span></div>
     <div id="card" hidden>
       <button class="x" id="cardX" aria-label="Fermer">×</button>
       <span class="eyebrow" id="cardRoom">Salon</span>
@@ -489,14 +503,17 @@ function wall(lv, a, b, o = {}) {
   };
   const ops = (o.open || []).map(([s, e, ty, sill, top]) => ({ s, e, ty, sill: sill ?? (ty === 'd' ? 0 : .9), top: top ?? (ty === 'd' ? 2.15 : 2.2) }))
     .sort((p, q) => p.s - q.s);
-  let cur = u0 - t / 2;
+  // Aux angles, les murs de façade nord/sud dépassent de 4 mm et les autres s'arrêtent 4 mm avant,
+  // pour qu'aucune face ne soit dans le même plan (source du scintillement).
+  const ex = hz && out ? t / 2 + .004 : t / 2 - .004;
+  let cur = u0 - ex;
   for (const op of ops) {
     piece(cur, op.s, 0, h, 'wall');
     if (op.ty === 'd') piece(op.s, op.e, op.top, h, 'lintel');
     else { piece(op.s, op.e, 0, op.sill, 'win'); piece(op.s, op.e, op.top, h, 'lintel'); windowFrame(grp, hz, line, op.s, op.e, base + op.sill, base + op.top, winStage); }
     cur = op.e;
   }
-  piece(cur, u1 + t / 2, 0, h, 'wall');
+  piece(cur, u1 + ex, 0, h, 'wall');
 }
 
 // =================== 1er ÉTAGE ===================
@@ -1129,6 +1146,7 @@ $('#hour').addEventListener('input', e => setHour(+e.target.value));
 // clavier, souris, tactile
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' && (e.target.type === 'search' || e.target.type === 'text')) return;
+  if (demo) { if (e.code === 'Escape') endDemo(); return; }
   if (e.code === 'Escape') { if (mode === 'walk') setMode('orbit'); else select(null); return; }
   if (mode !== 'walk') return;
   if (e.target.tagName === 'INPUT') e.target.blur();
@@ -1178,6 +1196,84 @@ $$('#pad button').forEach(b => {
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
 });
 
+// =================== DÉMO 30 s ===================
+// Point de vue en coordonnées sphériques autour d'une cible : az 0 = depuis le sud, az < 0 = depuis l'ouest.
+const sph = s => new THREE.Vector3(s.t.x + s.r * Math.cos(s.el * D2R) * Math.sin(s.az * D2R), s.t.y + s.r * Math.sin(s.el * D2R),
+  s.t.z + s.r * Math.cos(s.el * D2R) * Math.cos(s.az * D2R));
+const S = (t, r, el, az, fov = 40) => ({ t: new THREE.Vector3(...t), r, el, az, fov });
+const sine = u => .5 - .5 * Math.cos(Math.PI * u);
+// Parcours à pied : [seconde, x, z, cap en degrés, inclinaison en degrés]
+const DPATH = [[0, 6.85, 13.4, 0, -3], [1.7, 6.85, 11.3, 0, -3], [3.1, 6.9, 9.3, -12, -4], [4.5, 6.1, 7.9, -60, -6], [6.5, 4.7, 6.7, -38, -9]];
+const L1 = [6.3, .3, 7.2], L2 = [6.3, 3.4, 6.8], LA = [6.3, 2, 7.2], LE = [6.3, 5.2, 7.2];
+const DEMO = [
+  { d: 6.5, walk: true, cap: ['Visite à pied', 'Porche, hall d’entrée puis séjour'],
+    setup() { walkPath(0); P.lv = 1; resolve(); P.y = P.ground; demoMode('walk'); } },
+  { d: 2.5, to: S(L1, 26, 40, -28), cap: ['1er étage', 'Séjour · Cuisine · Pièces d’eau · Garage'],
+    setup() { demoMode('orbit'); view = 'rdc'; cut = true; exploded = false; applyView(); } },
+  { d: 4, orbit: [S(L1, 26, 40, -28), S(L1, 22, 36, 8)] },
+  { d: 1.5, to: S(L2, 24, 40, 18), cap: ['2e étage', 'Chambres · Bureau · Bibliothèque · Balcon'], setup() { view = 'etage'; applyView(); } },
+  { d: 3.5, orbit: [S(L2, 24, 40, 18), S(L2, 22, 36, 48)] },
+  { d: 1.5, to: S(LA, 32, 30, 40), cap: ['Maison entière', 'Toiture, façades en bois et jardin japonais'], setup() { view = 'tout'; cut = false; applyView(); } },
+  { d: 5, orbit: [S(LA, 32, 30, 40), S(LA, 30, 26, -75)] },
+  { d: 1.5, to: S(LE, 40, 30, -50), cap: ['Vue éclatée', 'Les deux niveaux et la toiture séparés'], setup() { exploded = true; applyView(); } },
+  { d: 4, orbit: [S(LE, 40, 30, -50), S(LE, 38, 28, -5)] },
+];
+const DEMO_T = DEMO.reduce((a, s) => a + s.d, 0);
+let demo = null;
+const dLook = new THREE.Vector3();
+function demoMode(m) {
+  mode = m; controls.enabled = false; controls.autoRotate = false;
+  if (m === 'walk') { camera.fov = 68; camera.updateProjectionMatrix(); }
+  applyView();
+}
+function walkPath(t) {
+  let k = 0; while (k < DPATH.length - 2 && t > DPATH[k + 1][0]) k++;
+  const a = DPATH[k], b = DPATH[k + 1], u = clamp((t - a[0]) / (b[0] - a[0]), 0, 1);
+  P.x = a[1] + (b[1] - a[1]) * u; P.z = a[2] + (b[2] - a[2]) * u;
+  P.yaw = (a[3] + (b[3] - a[3]) * u) * D2R; P.pitch = (a[4] + (b[4] - a[4]) * u) * D2R;
+}
+function startDemo() {
+  if (demo) { endDemo(); return; }
+  select(null); setPlaying(false); prog = NST; keys.clear(); fly = null;
+  $('#bRot').setAttribute('aria-pressed', 'false'); app.classList.remove('open');
+  demo = { t0: performance.now(), i: -1 };
+  $('#demoBtn').textContent = '■ Arrêter la démo'; $('#demoBar').hidden = false; $('#hint').hidden = true;
+}
+function endDemo() {
+  if (!demo) return; demo = null;
+  $('#demoBtn').textContent = '▶ Démo 30 s'; $('#demoBar').hidden = true; $('#demoCap').hidden = true; $('#hint').hidden = false;
+  mode = 'orbit'; camera.fov = 40; camera.updateProjectionMatrix();
+  savedOrbit = null; fly = null; controls.enabled = true; applyView();
+}
+function stepDemo(now, dt) {
+  const el = (now - demo.t0) / 1000;
+  if (el >= DEMO_T) { endDemo(); return; }
+  let acc = 0, i = 0; while (i < DEMO.length - 1 && el >= acc + DEMO[i].d) { acc += DEMO[i].d; i++; }
+  const sg = DEMO[i], u = clamp((el - acc) / sg.d, 0, 1);
+  if (demo.i !== i) {
+    demo.i = i; if (sg.setup) sg.setup();
+    demo.fP = camera.position.clone(); demo.fF = camera.fov;
+    const dist = mode === 'walk' ? 5 : camera.position.distanceTo(controls.target);
+    demo.fL = camera.position.clone().add(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(dist));
+    if (sg.cap) { $('#demoT').textContent = sg.cap[0]; $('#demoS').textContent = sg.cap[1]; $('#demoCap').hidden = false; }
+  }
+  if (sg.walk) { walkPath(el - acc); stepWalk(dt); }
+  else if (sg.to) {
+    const e = sine(u);
+    camera.position.lerpVectors(demo.fP, sph(sg.to), e); dLook.lerpVectors(demo.fL, sg.to.t, e);
+    camera.fov = demo.fF + (sg.to.fov - demo.fF) * e; camera.updateProjectionMatrix();
+    camera.lookAt(dLook); controls.target.copy(dLook);
+  } else {
+    const [a, b] = sg.orbit, e = sine(u), lerp = (p, q) => p + (q - p) * e;
+    const s = { t: a.t.clone().lerp(b.t, e), r: lerp(a.r, b.r), el: lerp(a.el, b.el), az: lerp(a.az, b.az) };
+    camera.position.copy(sph(s)); camera.lookAt(s.t); controls.target.copy(s.t);
+  }
+  $('#demoBar i').style.width = (el / DEMO_T * 100).toFixed(2) + '%';
+}
+$('#demoBtn').addEventListener('click', startDemo);
+// Toute interaction de l'utilisateur interrompt la démo.
+document.addEventListener('pointerdown', e => { if (demo && !e.target.closest('#demoBtn')) endDemo(); }, true);
+
 // =================== BOUCLE ===================
 let W = 1, Hh = 1;
 function onResize() {
@@ -1195,7 +1291,7 @@ function frame(now) {
   const lift = exploded ? 4.2 : 0;
   g2.position.y += (lift - g2.position.y) * Math.min(1, dt * 6);
   gRoof.position.y += (lift * 1.9 - gRoof.position.y) * Math.min(1, dt * 6);
-  if (mode === 'walk') stepWalk(dt); else { stepFly(now); controls.update(); }
+  if (demo) stepDemo(now, dt); else if (mode === 'walk') stepWalk(dt); else { stepFly(now); controls.update(); }
   renderer.render(scene, camera);
   updateLabels(W, Hh); updateHud();
   const mk = marker();
